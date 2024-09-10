@@ -93,19 +93,19 @@ pub fn weighted_non_maximum_suppression(
         }
 
         // Weighted merging of similar (close) boxes
-        if !candidates.is_empty() {
-            let num_features = detection.data.len();
-            let mut weighted = Array2::<f32>::zeros((num_features, 2));
-            let mut total_score = 0.0;
-
-            for &(index, score) in &candidates {
-                total_score += score;
-                weighted = weighted + detections[index].data.view() * score;
-            }
-
-            weighted /= total_score;
-            weighted_detection = Detection::new(weighted, detection.score);
-        }
+        // if !candidates.is_empty() {
+        //     let num_features = detection.data.len();
+        //     let mut weighted = Array2::<f32>::zeros((num_features, 2));
+        //     let mut total_score = 0.0;
+        //
+        //     for &(index, score) in &candidates {
+        //         total_score += score;
+        //         weighted = weighted + detections[index].data.view() * score;
+        //     }
+        //
+        //     weighted /= total_score;
+        //     weighted_detection = Detection::new(weighted, detection.score);
+        // }
 
         outputs.push(weighted_detection);
 

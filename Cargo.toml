@@ -6,5 +6,18 @@ edition = "2021"
 [dependencies]
 ndarray = "0.16.1"
 image = "0.25.2"
-opencv = "0.92.3"
+opencv = {  version = "0.92.3" ,  features = ["clang-runtime"] }
 anyhow = "1.0.86"
+tflite = "0.9.8"
+nalgebra = "0.33.0"
+bytemuck = "1.18.0"
+
+[lib]
+name = "rs_face_detection_tfite"
+
+[profile.dev]
+opt-level = 0
+incremental = false
+
+[profile.release]
+opt-level = 3
