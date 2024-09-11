@@ -1,4 +1,4 @@
-use ndarray::ArrayD;
+use ndarray::{Array2, ArrayD, IxDyn, s};
 use std::slice::Iter;
 
 #[derive(Debug, Clone)]
@@ -6,12 +6,12 @@ pub struct ImageTensor {
     /// Tensor data obtained from an image with optional letterboxing.
     /// The data may contain an extra dimension for batching (the default).
     pub tensor_data: ArrayD<f32>, // ArrayD represents a dynamic-dimensional array in Rust.
-    pub padding: (f32, f32, f32, f32), // Tuple for padding (left, top, right, bottom).
+    pub padding: (f64, f64, f64, f64), // Tuple for padding (left, top, right, bottom).
     pub original_size: (i32, i32), // Tuple for the original image size (width, height).
 }
 
 impl ImageTensor {
-    pub fn new(tensor_data: ArrayD<f32>, padding: (f32, f32, f32, f32), original_size: (i32, i32)) -> Self {
+    pub fn new(tensor_data: ArrayD<f32>, padding: (f64, f64, f64, f64), original_size: (i32, i32)) -> Self {
         Self {
             tensor_data,
             padding,
@@ -26,20 +26,20 @@ use std::f32::consts::PI;
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
     /// The center of the rectangle (x, y).
-    pub x_center: f32,
-    pub y_center: f32,
+    pub x_center: f64,
+    pub y_center: f64,
     /// The width and height of the rectangle.
-    pub width: f32,
-    pub height: f32,
+    pub width: f64,
+    pub height: f64,
     /// The rotation of the rectangle in radians (clockwise).
-    pub rotation: f32,
+    pub rotation: f64,
     /// Indicates whether properties are relative to image size (normalized).
     pub normalized: bool,
 }
 
 impl Rect {
     /// Create a new rectangle.
-    pub fn new(x_center: f32, y_center: f32, width: f32, height: f32, rotation: f32, normalized: bool) -> Self {
+    pub fn new(x_center: f64, y_center: f64, width: f64, height: f64, rotation: f64, normalized: bool) -> Self {
         Self {
             x_center,
             y_center,
@@ -51,17 +51,17 @@ impl Rect {
     }
 
     /// Return the size of the rectangle as a tuple (width, height).
-    pub fn size(&self) -> (f32, f32) {
+    pub fn size(&self) -> (f64, f64) {
         let (w, h) = (self.width, self.height);
         if self.normalized {
             (w, h)
         } else {
-            (w as i32 as f32, h as i32 as f32)
+            (w as i32 as f64, h as i32 as f64)
         }
     }
 
     /// Return a scaled version of the rectangle.
-    pub fn scaled(&self, size: (f32, f32), normalize: bool) -> Rect {
+    pub fn scaled(&self, size: (f64, f64), normalize: bool) -> Rect {
         if self.normalized == normalize {
             return *self;
         }
@@ -83,7 +83,7 @@ impl Rect {
     }
 
     /// Return the corners of the rectangle as a list of tuples `[(x, y), ...]`.
-    pub fn points(&self) -> Vec<(f32, f32)> {
+    pub fn points(&self) -> Vec<(f64, f64)> {
         let (x, y) = (self.x_center, self.y_center);
         let (w, h) = (self.width / 2.0, self.height / 2.0);
         let mut pts = vec![
@@ -96,7 +96,7 @@ impl Rect {
         if self.rotation != 0.0 {
             let s = self.rotation.sin();
             let c = self.rotation.cos();
-            let rotation_matrix = |pt: (f32, f32)| -> (f32, f32) {
+            let rotation_matrix = |pt: (f64, f64)| -> (f64, f64) {
                 let (dx, dy) = (pt.0 - x, pt.1 - y);
                 (x + dx * c - dy * s, y + dx * s + dy * c)
             };
@@ -109,15 +109,15 @@ impl Rect {
 
 #[derive(Debug, Clone, Copy)]
 pub struct BBox {
-    pub xmin: f32,
-    pub ymin: f32,
-    pub xmax: f32,
-    pub ymax: f32,
+    pub xmin: f64,
+    pub ymin: f64,
+    pub xmax: f64,
+    pub ymax: f64,
 }
 
 impl BBox {
     /// Create a new BBox
-    pub fn new(xmin: f32, ymin: f32, xmax: f32, ymax: f32) -> Self {
+    pub fn new(xmin: f64, ymin: f64, xmax: f64, ymax: f64) -> Self {
         Self {
             xmin,
             ymin,
@@ -127,17 +127,17 @@ impl BBox {
     }
 
     /// Return the box as a tuple (xmin, ymin, xmax, ymax)
-    pub fn as_tuple(&self) -> (f32, f32, f32, f32) {
+    pub fn as_tuple(&self) -> (f64, f64, f64, f64) {
         (self.xmin, self.ymin, self.xmax, self.ymax)
     }
 
     /// Calculate the width of the bounding box
-    pub fn width(&self) -> f32 {
+    pub fn width(&self) -> f64 {
         self.xmax - self.xmin
     }
 
     /// Calculate the height of the bounding box
-    pub fn height(&self) -> f32 {
+    pub fn height(&self) -> f64 {
         self.ymax - self.ymin
     }
 
@@ -152,7 +152,7 @@ impl BBox {
     }
 
     /// Calculate the area of the bounding box
-    pub fn area(&self) -> f32 {
+    pub fn area(&self) -> f64 {
         if self.empty() {
             0.0
         } else {
@@ -175,7 +175,7 @@ impl BBox {
     }
 
     /// Scale the bounding box by the given size
-    pub fn scale(&self, size: (f32, f32)) -> BBox {
+    pub fn scale(&self, size: (f64, f64)) -> BBox {
         let (sx, sy) = size;
         BBox::new(self.xmin * sx, self.ymin * sy, self.xmax * sx, self.ymax * sy)
     }
@@ -185,42 +185,35 @@ impl BBox {
         if !self.normalized() {
             return *self;
         }
-        self.scale((size.0 as f32, size.1 as f32))
+        self.scale((size.0 as f64, size.1 as f64))
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Landmark {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
 impl Landmark {
-    pub fn new(x: f32, y: f32, z: f32) -> Self {
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
     }
 }
 
-
-
-
 #[derive(Debug, Clone)]
 pub struct Detection {
-    pub data: Vec<(f32, f32)>,  // Storing the data as a vector of tuples for (x, y) coordinates
-    pub score: f32,             // Confidence score of the detection
+    pub data: Array2<f32>,
+    pub score: f32,
 }
 
 impl Detection {
     /// Create a new Detection
     pub fn new(data: Vec<f32>, score: f32) -> Self {
         assert!(data.len() >= 4, "Data must contain at least four elements for the bounding box");
-
-        // Reshape the data into a vector of (x, y) pairs
-        let mut reshaped_data = Vec::with_capacity(data.len() / 2);
-        for chunk in data.chunks(2) {
-            reshaped_data.push((chunk[0], chunk[1]));
-        }
+        let shape = (data.len() /  2, 2);
+        let reshaped_data: Array2<f32> = Array2::from_shape_vec(shape, data).unwrap();
 
         Self {
             data: reshaped_data,
@@ -228,41 +221,37 @@ impl Detection {
         }
     }
 
-    /// Get the number of keypoints (excluding the bounding box)
     pub fn keypoint_count(&self) -> usize {
-        self.data.len() - 2
+        self.data.nrows() - 2
     }
 
-    /// Get a keypoint by index
-    pub fn keypoint(&self, index: usize) -> Option<(f32, f32)> {
-        if index + 2 < self.data.len() {
-            Some(self.data[index + 2])
-        } else {
-            None
+    // Get keypoint by index
+    pub fn keypoint(&self, key: usize) -> (f32, f32) {
+        let row = self.data.row(key + 2);
+        (row[0], row[1])
+    }
+
+
+    // Get bounding box
+    pub fn bbox(&self) -> BBox {
+        let xmin = self.data[[0, 0]] as f64;
+        let ymin = self.data[[0, 1]] as f64;
+        let xmax = self.data[[1, 0]] as f64;
+        let ymax = self.data[[1, 1]] as f64;
+        BBox { xmin, ymin, xmax, ymax }
+    }
+
+    // Return a scaled version of the bounding box and keypoints
+    pub fn scaled(&self, factor: f32) -> Detection {
+        let scaled_data: Array2<f32> = self.data.mapv(|val| val * factor);
+
+        Detection {
+            data: scaled_data,
+            score: self.score,
         }
     }
-
-    /// Return an iterator over the keypoints
-    pub fn keypoints(&self) -> Iter<'_, (f32, f32)> {
-        self.data[2..].iter()
-    }
-
-    /// Get the bounding box of the detection
-    pub fn bbox(&self) -> BBox {
-        let (xmin, ymin) = self.data[0];
-        let (xmax, ymax) = self.data[1];
-        BBox::new(xmin, ymin, xmax, ymax)
-    }
-
-    /// Return a scaled version of the detection
-    pub fn scaled(&self, factor: f32) -> Detection {
-        let scaled_data: Vec<(f32, f32)> = self.data.iter()
-            .map(|&(x, y)| (x * factor, y * factor))
-            .collect();
-
-        Detection::new(scaled_data.into_iter().flat_map(|(x, y)| vec![x, y]).collect(), self.score)
-    }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,7 +264,7 @@ mod tests {
         println!("Detection: {:?}", detection);
         println!("Number of keypoints: {}", detection.keypoint_count());
 
-        if let Some(keypoint) = detection.keypoint(0) {
+        if let keypoint = detection.keypoint(0) {
             println!("First keypoint: {:?}", keypoint);
         }
 

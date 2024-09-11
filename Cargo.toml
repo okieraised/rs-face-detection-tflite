@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ndarray = "0.16.1"
+ndarray = { version = "0.16.1", features = ["rayon"] }
 image = "0.25.2"
 opencv = {  version = "0.92.3" ,  features = ["clang-runtime"] }
 anyhow = "1.0.86"
@@ -17,7 +17,7 @@ name = "rs_face_detection_tfite"
 
 [profile.dev]
 opt-level = 0
-incremental = false
+incremental = true
 
 [profile.release]
 opt-level = 3

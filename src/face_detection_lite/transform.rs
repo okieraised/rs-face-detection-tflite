@@ -1,4 +1,5 @@
-use ndarray::{Array2, ArrayD};
+use std::f64::EPSILON;
+use ndarray::{Array2, ArrayD, Axis, Zip};
 use ndarray::ArrayBase;
 use ndarray::Dim;
 use ndarray::NdFloat;
@@ -10,7 +11,7 @@ use opencv::{core, imgproc, prelude::*};
 use opencv::core::{copy_make_border, flip, Point2f, Scalar, Size, Vec3b, Vector, BORDER_CONSTANT};
 use opencv::imgcodecs::imwrite;
 use opencv::imgproc::{resize, INTER_LINEAR};
-use crate::face_detection_lite::types::{BBox, ImageTensor, Landmark, Rect};
+use crate::face_detection_lite::types::{BBox, Detection, ImageTensor, Landmark, Rect};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeMode {
@@ -40,43 +41,55 @@ impl SizeMode {
     }
 }
 
+pub fn sigmoid(x: f32) -> f32 {
+    1.0 / (1.0 + (-x).exp())
+}
 
-// fn sigmoid<T>(data: &ArrayBase<T, Dim<[usize; 1]>>) -> ArrayD<T>
-//     where
-//         T: NdFloat,
-// {
-//     1.0 / (1.0 + (-data).mapv(|x| x.exp()))
-// }
+pub fn detection_letterbox_removal(detections: Vec<Detection>, padding: (f64, f64, f64, f64)) -> Vec<Detection> {
+    let (left, top, right, bottom) = padding;
+    let h_scale = 1.0 - (left + right);
+    let v_scale = 1.0 - (top + bottom);
 
+    // Ensure we are not dividing by very small values
+    assert!(h_scale > EPSILON, "Horizontal scale is too small");
+    assert!(v_scale > EPSILON, "Vertical scale is too small");
 
+    // Adjust a detection
+    fn adjust_data(det: &Detection, left: f32, top: f32, h_scale: f32, v_scale: f32) -> Detection {
+        let mut adjusted_data = det.data.clone();
+        for mut row in adjusted_data.rows_mut() {
+            row[0] = (row[0] - left) / h_scale;
+            row[1] = (row[1] - top) / v_scale;
+        }
 
-fn normalize_image(image: DynamicImage) -> DynamicImage {
-    match image {
-        DynamicImage::ImageRgb8(_) => image,
-        _ => image.to_rgb8().into(),
+        let (adjusted, _) = adjusted_data.into_raw_vec_and_offset();
+
+        Detection::new(adjusted, det.score)
     }
+
+    // Apply adjustment to all detections
+    detections
+        .into_iter()
+        .map(|detection| adjust_data(
+            &detection,
+            left as f32,
+            top as f32,
+            h_scale as f32,
+            v_scale as f32,
+        ))
+        .collect()
 }
 
-fn normalize_image_from_path(image_path: &str) -> DynamicImage {
-    let image = open(&Path::new(image_path)).expect("Failed to open image");
-    normalize_image(image)
-}
-
-fn normalize_image_from_array(array: &[u8], width: u32, height: u32) -> DynamicImage {
-    let image = RgbImage::from_raw(width, height, array.to_vec())
-        .expect("Failed to create image from array");
-    DynamicImage::ImageRgb8(image)
-}
 
 pub fn bbox_from_landmarks(landmarks: &[Landmark]) -> Result<BBox, Error> {
     if landmarks.len() < 2 {
         return Err(Error::msg("landmarks must contain at least 2 items"))
     }
 
-    let mut xmin = f32::INFINITY;
-    let mut ymin = f32::INFINITY;
-    let mut xmax = f32::NEG_INFINITY;
-    let mut ymax = f32::NEG_INFINITY;
+    let mut xmin = f64::INFINITY;
+    let mut ymin = f64::INFINITY;
+    let mut xmax = f64::NEG_INFINITY;
+    let mut ymax = f64::NEG_INFINITY;
 
     for landmark in landmarks {
         let (x, y) = (landmark.x, landmark.y);
@@ -97,15 +110,13 @@ pub fn bbox_from_landmarks(landmarks: &[Landmark]) -> Result<BBox, Error> {
 pub fn image_to_tensor(
     image: &Mat,
     roi: Option<Rect>,
-    output_size: Option<(f32, f32)>,
+    output_size: Option<(i32, i32)>,
     keep_aspect_ratio: bool,
-    output_range: (f32, f32),
+    output_range: (f64, f64),
     flip_horizontal: bool,
 ) -> Result<ImageTensor, Error> {
+
     let original_img_shape = image.size()?;
-
-    println!("img_shape: {:?}", original_img_shape);
-
     let mut roi = roi.unwrap_or_else(|| Rect {
         x_center: 0.5,
         y_center: 0.5,
@@ -115,42 +126,28 @@ pub fn image_to_tensor(
         normalized: true,
     });
 
-    roi = roi.scaled((original_img_shape.width as f32, original_img_shape.height as f32), false);
-    println!("scaled: {:?}", roi);
+    roi = roi.scaled((original_img_shape.width as f64, original_img_shape.height as f64), false);
 
-    let output_size = output_size.unwrap_or((roi.width, roi.height));
-    println!("output_size: {:?}", output_size);
-
+    let output_size = output_size.unwrap_or((roi.width as i32, roi.height as i32));
 
     let (width, height) = if keep_aspect_ratio {
-        roi.size()
+        (roi.size().0 as i32, roi.size().1 as i32)
     } else {
         output_size
     };
 
-    let src_points = roi.points();
-    println!("src_points: {:?}", src_points);
-    let dst_points: Vec<(f32, f32)> = vec![
-        (0., 0.), (width, 0.), (width, height), (0., height)
-    ];
-    println!("dst_points: {:?}", dst_points);
-
-    let coeff = perspective_transform_coeff(&src_points, &dst_points)?;
-    println!("coeff: {:?}", coeff);
-
-
     // Define the corresponding points in the input image
     let mut src_points = Vector::<Point2f>::new();
     for (_, &point) in roi.points().iter().enumerate() {
-        src_points.push(Point2f::new(point.0.clone(), point.1.clone()));
+        src_points.push(Point2f::new(point.0.clone() as f32, point.1.clone() as f32));
     }
 
     // Define the corresponding points in the output image
     let mut dst_points = Vector::<Point2f>::new();
     dst_points.push(Point2f::new(0.0, 0.0));
-    dst_points.push(Point2f::new(width, 0.));
-    dst_points.push(Point2f::new(width, height));
-    dst_points.push(Point2f::new(0., height));
+    dst_points.push(Point2f::new(width as f32, 0.));
+    dst_points.push(Point2f::new(width as f32, height as f32));
+    dst_points.push(Point2f::new(0., height as f32));
 
     let transformation_matrix = imgproc::get_perspective_transform(&src_points, &dst_points, INTER_LINEAR)?;
 
@@ -160,42 +157,36 @@ pub fn image_to_tensor(
         image,
         &mut roi_image,
         &transformation_matrix,
-        Size::new(width as i32, height as i32),
+        Size::new(width, height),
         INTER_LINEAR,
         BORDER_CONSTANT,
         Scalar::all(0.0),
     )?;
 
-    imwrite("./perspective_image.jpeg", &roi_image, &Default::default())?;
+    // imwrite("./perspective_image.jpeg", &roi_image, &Default::default())?;
 
-    let mut pad_x: f32 = 0.;
-    let mut pad_y: f32 = 0.;
+    let mut pad_x: f64 = 0.;
+    let mut pad_y: f64 = 0.;
 
     if keep_aspect_ratio {
-        let out_aspect = output_size.1 / output_size.0;
+        let out_aspect = (output_size.1 / output_size.0) as f64;
         let roi_aspect = roi.height / roi.width;
-        let (mut new_width, mut new_height) = (roi.width, roi.height);
+        let (mut new_width, mut new_height) = (roi.width as i32, roi.height as i32);
 
         if out_aspect > roi_aspect {
-            new_height = roi.width * out_aspect;
+            new_height = (roi.width * out_aspect) as i32;
             pad_y = (1.0 - roi_aspect / out_aspect) / 2.0;
         } else {
-            new_width = roi.height / out_aspect;
+            new_width = (roi.height / out_aspect) as i32;
             pad_x = (1.0 - out_aspect / roi_aspect) / 2.0;
         }
 
-        if new_width != roi.width || new_height != roi.height {
-            let (pad_h, pad_v) = (pad_x * new_width, pad_y * new_height);
-
-            println!("pad_h: {:?}", pad_h);
-            println!("pad_v: {:?}", pad_v);
-            println!("new_width: {:?}", new_width);
-            println!("new_height: {:?}", new_height);
-
-            let top = pad_v as i32;
-            let bottom = pad_v as i32;
-            let left = pad_h as i32;
-            let right = pad_h as i32;
+        if new_width != roi.width as i32 || new_height != roi.height as i32 {
+            let (pad_h, pad_v) = ((pad_x * new_width as f64) as i32, (pad_y * new_height as f64) as i32);
+            let top = pad_v;
+            let bottom = pad_v;
+            let left = pad_h;
+            let right = pad_h;
 
             let mut padded_image = Mat::default();
             copy_make_border(
@@ -205,19 +196,17 @@ pub fn image_to_tensor(
                 BORDER_CONSTANT,
                 Scalar::all(0.0),
             )?;
-            imwrite("./padded_image.jpeg", &padded_image, &Default::default())?;
+            //imwrite("./padded_image.jpeg", &padded_image, &Default::default())?;
 
-            // Step 2: Resize the padded image to the new width and height
             let mut resized_image = Mat::default();
             resize(
                 &padded_image,
                 &mut resized_image,
-                Size::new(new_width as i32, new_height as i32),
+                Size::new(new_width, new_height),
                 0.0, 0.0,
                 INTER_LINEAR,
             )?;
-            imwrite("./resized_image.jpeg", &resized_image, &Default::default())?;
-
+            // imwrite("./resized_image.jpeg", &resized_image, &Default::default())?;
             roi_image = resized_image;
         }
 
@@ -225,28 +214,25 @@ pub fn image_to_tensor(
         resize(
             &roi_image,
             &mut resized_image,
-            Size::new(output_size.0 as i32, output_size.1 as i32),
+            Size::new(output_size.0, output_size.1),
             0.0,
             0.0,
             INTER_LINEAR,
         ).unwrap();
-        // println!("output_size: {:?}", output_size);
-        imwrite("./resized_image2.jpeg", &resized_image, &Default::default())?;
+
+        // imwrite("./resized_image2.jpeg", &resized_image, &Default::default())?;
         roi_image = resized_image;
     }
 
     if flip_horizontal {
         let mut flipped_image = Mat::default();
-        flip(&image, &mut flipped_image, 1)?;
+        flip(&roi_image, &mut flipped_image, 1)?;
         roi_image = flipped_image;
     };
 
     let min_val = output_range.0;
     let max_val = output_range.1;
-
     let img_shape = roi_image.size()?;
-
-    println!("img_shapeimg_shape: {:?}", img_shape);
 
     let mut tensors = Array3::<f32>::zeros((
         img_shape.width as usize,
@@ -258,7 +244,7 @@ pub fn image_to_tensor(
         for y in 0..img_shape.width as usize {
             for x in 0..img_shape.height as usize {
                 let pixel_value = roi_image.at_2d::<Vec3b>(y as i32, x as i32).unwrap()[i];
-                tensors[[y, x, i]] = pixel_value as f32 * (max_val - min_val) / 255.0 + min_val;
+                tensors[[y, x, i]] = (pixel_value as f64 * (max_val - min_val) / 255.0 + min_val) as f32;
             }
         }
     }

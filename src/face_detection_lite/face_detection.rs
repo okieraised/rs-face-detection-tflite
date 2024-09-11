@@ -1,13 +1,15 @@
 use std::ops::{AddAssign, Div};
 use std::path::PathBuf;
 use anyhow::Error;
-use bytemuck::cast_slice;
-use ndarray::{s, Array, Array2, Array3, Axis, IxDyn};
-use opencv::imgcodecs::imwrite;
+use ndarray::{s, Array, Array2, Array3, Axis};
 use tflite::ops::builtin::BuiltinOpResolver;
 use tflite::{FlatBufferModel, InterpreterBuilder};
-use crate::face_detection_lite::transform::image_to_tensor;
+use tflite::op_resolver::OpResolver;
+use crate::face_detection_lite::transform::{detection_letterbox_removal, image_to_tensor, sigmoid};
 use crate::face_detection_lite::utils::convert_image_to_mat;
+use ndarray::parallel::prelude::*;
+use crate::face_detection_lite::nms::non_maximum_suppression;
+use crate::face_detection_lite::types::Detection;
 
 pub struct SSDOptions{
     pub num_layers: i32,
@@ -105,20 +107,14 @@ const MIN_SCORE: f32 = 0.5;
 /// NMS similarity threshold
 const MIN_SUPPRESSION_THRESHOLD: f32 = 0.3;
 
-
-
-
-pub struct FaceDetection {
-    // model_path: PathBuf,
-    // interpreter: Interpreter,
-    // input_index: usize,
-    input_shape: Vec<usize>,
-    // bbox_index: usize,
-    // score_index: usize,
+pub(crate) struct FaceDetection {
+    model_path: PathBuf,
+    model: FlatBufferModel,
     anchors: Array2<f32>,
 }
 
 impl FaceDetection {
+    
     pub fn new(model_type: FaceDetectionModel, model_path: Option<String>) -> Result<FaceDetection, Error> {
         let mut ssd_opts = SSDOptions::new_front();  // Placeholder for SSD options
         let mut model_path_buf: PathBuf;
@@ -126,7 +122,7 @@ impl FaceDetection {
         if let Some(path) = model_path {
             model_path_buf = PathBuf::from(path);
         } else {
-            model_path_buf = PathBuf::from("/Users/tripham/Desktop/rs-face-detection-tflite/src/models");
+            model_path_buf = PathBuf::from("/home/tripg/Documents/repo/rs-face-detection-tflite/src/models");
         }
 
         match model_type {
@@ -153,166 +149,190 @@ impl FaceDetection {
             _ => return Err(Error::msg("unsupported model type")),
         }
 
-        println!("model_path_buf: {:?}", model_path_buf.as_path());
-
-        let model = FlatBufferModel::build_from_file(model_path_buf)?;
-        let resolver = BuiltinOpResolver::default();
-
-        let builder = InterpreterBuilder::new(&model, &resolver)?;
-        let mut interpreter = builder.build()?;
-
-
-        let input_details = interpreter.get_input_details()?;
-        let output_details = interpreter.get_output_details()?;
         let anchors = ssd_generate_anchors(&ssd_opts);
+        let model = FlatBufferModel::build_from_file(model_path_buf.clone())?;
 
+        Ok(FaceDetection {
+            model_path: model_path_buf,
+            model,
+            anchors,
+        })
+    }
 
+    pub fn infer(&self, raw_img: &[u8]) -> Result<Vec<Detection>, Error>{
+        // Init model interpreter
+        let resolver = BuiltinOpResolver::default();
+        let builder = InterpreterBuilder::new(&self.model, &resolver)?;
+        let mut interpreter = builder.build()?;
+        interpreter.allocate_tensors()?;
+
+        // Get model input image shape
+        let input_details = interpreter.get_input_details()?;
         let input_shape = input_details[0].dims.clone();
 
-        println!("input_details: {:?}", input_details);
-        println!("output_details: {:?}", output_details);
-        // println!("anchors: {:?}", anchors);
-
-
-        /// process here
-        let height = input_shape[1];
-        let width = input_shape[2];
-
-        let im_bytes: &[u8] = include_bytes!("/Users/tripham/Desktop/face-detection-tflite/women.jpeg");
-        let image = convert_image_to_mat(im_bytes)?;
-
-        // imwrite("./test.jpeg", &image, &Default::default());
-
+        // convert image to opencv matrix
+        let (height, width) = (input_shape[1], input_shape[2]);
+        let image = convert_image_to_mat(raw_img)?;
         let image_data = image_to_tensor(
             &image,
             None,
-            Some((width as f32, height as f32)),
+            Some((width as i32, height as i32)),
             true,
             (-1.0, 1.0),
-            false
+            false,
         )?;
 
         // Add additional axis
         let input_data = image_data.tensor_data.
             into_dimensionality::<ndarray::IxDyn>().
             unwrap().
-            insert_axis(ndarray::Axis(0));
+            insert_axis(Axis(0));
 
+        // Infer model with input data
         let inputs = interpreter.inputs().to_vec();
-        println!("{:?}", inputs);
-
         let input_index = inputs[0];
-        let info = interpreter.tensor_info(input_index).unwrap();
-        println!("tensor info: {:?}", info);
-
         let sub_tensor: Vec<f32> = input_data.into_iter().collect();
-
         interpreter.tensor_data_mut(input_index)?.copy_from_slice(&sub_tensor);
         interpreter.invoke()?;
 
+        // retrieve outputs
         let outputs = interpreter.outputs().to_vec();
-        println!("{:?}", outputs);
+        let (bbox_index, score_index) = (outputs[0], outputs[1]);
 
-        let bbox_index = outputs[0];
-        let score_index = outputs[1];
+        // retrieve output info
+        let bbox_info = interpreter.
+            tensor_info(bbox_index).
+            ok_or(Error::msg("missing bounding box outputs info"))?;
 
-        println!("bbox_index: {:?}", bbox_index);
+        let score_info = interpreter.
+            tensor_info(score_index).
+            ok_or(Error::msg("missing score outputs info"))?;
 
-        let bbox_info = interpreter.tensor_info(bbox_index).unwrap();
-        println!("bbox_info: {:?}", bbox_info);
-
-        let raw_boxes: &[f32] = interpreter.tensor_data(bbox_index).unwrap();
-        // println!("raw_boxes {:?}", raw_boxes);
-
-        let mut dimensions: Vec<usize> =  Vec::with_capacity(bbox_info.dims.len());
-        for dim in &bbox_info.dims {
-            dimensions.push(*dim);
-        }
-        let arr_raw_boxes: Array3<f32> = Array3::from_shape_vec(
-            (dimensions[0], dimensions[1], dimensions[2]),
-            raw_boxes.to_vec(),
+        // Retrieve raw detection boxes and convert to Array3<f32>
+        let raw_boxes_s: &[f32] = interpreter.tensor_data(bbox_index).unwrap();
+        let raw_boxes: Array3<f32> = Array3::from_shape_vec(
+            (bbox_info.dims[0], bbox_info.dims[1], bbox_info.dims[2]),
+            raw_boxes_s.to_vec(),
         )?;
-        println!("arr_raw_boxes {:?}", arr_raw_boxes);
 
-        // let score_info = interpreter.tensor_info(score_index).unwrap();
-        // println!("score_info: {:?}", score_info);
-        //
-        // let raw_score: &[f32] = interpreter.tensor_data(score_index).unwrap();
-        // // println!("raw_score {:?}", raw_score);
-        //
-        // let mut dimensions: Vec<usize> =  Vec::with_capacity(score_info.dims.len());
-        // for dim in &score_info.dims {
-        //     dimensions.push(*dim);
-        // }
-        // let arr_raw_score = Array::from_shape_vec(
-        //     dimensions,
-        //     raw_score.to_vec(),
-        // )?;
-        // println!("arr_raw_score {:?}", arr_raw_score);
+        let raw_scores_s: &[f32] = interpreter.tensor_data(score_index).unwrap();
+        let raw_scores = Array::from_shape_vec(
+            (score_info.dims[0], score_info.dims[1], score_info.dims[2]),
+            raw_scores_s.to_vec(),
+        )?;
 
-        // decode_boxes
-        // let scale = input_shape[1];
-        // let shape = arr_raw_boxes.shape();
-        // let num_points = shape[shape.len() - 1] / 2;
-        // println!("scale {:?}", scale);
-        // println!("shape {:?}", shape);
-        // println!("num_points {:?}", num_points);
-        //
-        // let raw_boxes_3: Array3<f32> = arr_raw_boxes.clone().into_shape_with_order([arr_raw_boxes.shape()[0].clone(), arr_raw_boxes.shape()[1].clone(), arr_raw_boxes.shape()[2].clone()])?;
-        // println!("raw_boxes_3 {:?}", raw_boxes_3);
-        // let transposed_tensors: Array3<f32> = arr_raw_boxes.permuted_axes([shape[0], num_points, 2]).try_into()?;
-        // println!("transposed_tensors {:?}", transposed_tensors);
+        let boxes = self.decode_boxes(raw_boxes, input_shape[1] as f32)?;
+        let scores = self.get_sigmoid_score(raw_scores)?;
 
+        let detections = self.convert_to_detections(boxes, scores)?;
+        let pruned_detections = non_maximum_suppression(
+            detections,
+            MIN_SUPPRESSION_THRESHOLD,
+            Some(MIN_SCORE),
+            true,
+        );
 
-        Ok(FaceDetection {
-            input_shape,
-            anchors,
-        })
+        let detections = detection_letterbox_removal(pruned_detections, image_data.padding);
+        println!("detections: {:?}", detections);
+        Ok(detections)
     }
 
-    fn decode_boxes(&self, raw_boxes: Array<f32, IxDyn>) -> Result<(), Error> {
-
-        let scale = self.input_shape[1];
+    fn decode_boxes(&self, raw_boxes: Array3<f32>, scale: f32) -> Result<Array3<f32>, Error> {
         let shape = raw_boxes.shape();
         let num_points = shape[shape.len() - 1] / 2;
 
-        println!("num_points {:?}", num_points);
+        let shape = (raw_boxes.len() / (num_points * 2), num_points, 2);
+        let mut boxes = raw_boxes.mapv(|x| x / scale).
+            to_shape(shape)?.
+            to_owned();
 
-        // // Reshape raw_boxes to (-1, num_points, 2)
-        // let reshaped_boxes = raw_boxes.to_shape((shape[0], num_points, 2))?;
-        //
-        // // Scale all values (applies to positions, width, and height alike)
-        // let mut boxes = reshaped_boxes / scale;
-        //
-        // // Adjust center coordinates (x, y) to anchor positions
-        // // Anchors must be a 2D array matching (num_boxes, 2)
-        // for i in 0..self.anchors.shape()[0] {
-        //     let anchor = self.anchors.row(i).to_owned();
-        //
-        //     // Apply anchors to box coordinates
-        //     boxes.slice_mut(s![i, 0, ..]).add_assign(&anchor);
-        //
-        //     // Apply anchor for remaining points in the box
-        //     for j in 2..num_points {
-        //         boxes.slice_mut(s![i, j, ..]).add_assign(&anchor);
-        //     }
-        // }
-        //
-        // // Convert x_center, y_center, w, h to xmin, ymin, xmax, ymax
-        // let center = boxes.index_axis(Axis(1), 0).to_owned();
-        // let half_size = boxes.index_axis(Axis(1), 1).div(2.0);
-        //
-        // // Modify the boxes to (xmin, ymin) and (xmax, ymax)
-        // let mut xmin_ymin = boxes.index_axis_mut(Axis(1), 0);
-        // let mut xmax_ymax = boxes.index_axis_mut(Axis(1), 1);
-        //
-        // xmin_ymin -= &half_size;
-        // xmax_ymax += &half_size;
-        //
-        // Ok(boxes)
-        Ok(())
+        let mut boxes_0 = boxes.slice_mut(s![.., 0, ..]);
+        boxes_0 += &self.anchors;
+
+        for i in 2..num_points {
+            let mut boxes_slice = boxes.slice_mut(s![.., i, ..]);
+            boxes_slice += &self.anchors;
+        }
+
+        let center = boxes.slice(s![.., 0, ..]).to_owned();
+        let half_size = &boxes.slice(s![.., 1, ..]) / 2.0;
+        {
+            let mut boxes_0 = boxes.slice_mut(s![.., 0, ..]);
+            boxes_0.assign(&(&center - &half_size));
+        }
+        {
+            let mut boxes_1 = boxes.slice_mut(s![.., 1, ..]);
+            boxes_1.assign(&(&center + &half_size));
+        }
+        // println!("boxes: {:?}", boxes);
+        Ok(boxes)
+    }
+
+    fn get_sigmoid_score(&self, mut raw_scores: Array3<f32>) -> Result<Array3<f32>, Error>{
+        raw_scores.par_mapv_inplace(|x| {
+            if x < -RAW_SCORE_LIMIT {
+                -RAW_SCORE_LIMIT
+            } else if x > RAW_SCORE_LIMIT {
+                RAW_SCORE_LIMIT
+            } else {
+                x
+            }
+        });
+
+        raw_scores.par_mapv_inplace(|x| sigmoid(x));
+
+        Ok(raw_scores)
+    }
+
+    fn convert_to_detections(&self, boxes: Array3<f32>, scores: Array3<f32>) -> Result<Vec<Detection>, Error> {
+        fn is_valid(bbox: &Array2<f32>) -> bool {
+            let row0 = bbox.row(0);
+            let row1 = bbox.row(1);
+
+            row1.iter().zip(row0.iter()).all(|(&x1, &x0)| x1 > x0)
+        }
+
+        let mut detections: Vec<Detection> = Vec::new();
+        let score_above_threshold = scores.mapv(|score| score > MIN_SCORE);
+        let mut filtered_scores_idx: Vec<usize> = Vec::new();
+        for ((_, j, _), &is_true) in score_above_threshold.indexed_iter() {
+            if is_true {
+                filtered_scores_idx.push(j);
+            }
+        }
+
+        // Filter scores
+        let mut filtered_scores = Vec::new();
+        for ((i, j, k), &is_true) in score_above_threshold.indexed_iter() {
+            if is_true {
+                filtered_scores.push(scores[[i, j, k]]);
+            }
+        }
+
+        let mut score_idx: Vec<usize> = Vec::new();
+        for ((i, j, k), &is_above_threshold) in score_above_threshold.indexed_iter() {
+            if is_above_threshold {
+                score_idx.push(j);
+            }
+        }
+
+        // Filter bounding boxes
+        let mut filtered_boxes = Vec::new();
+        for &i in &score_idx {
+            filtered_boxes.push(boxes.slice(s![i, .., ..]).to_owned());
+        }
+
+        for (bbox, score) in filtered_boxes.into_iter().zip(filtered_scores) {
+            if is_valid(&bbox) {
+                let (data, _) = bbox.into_raw_vec_and_offset();
+                detections.push(Detection::new(data, score.into()))
+            }
+        }
+        Ok(detections)
     }
 }
+
+
 
 fn ssd_generate_anchors(opts: &SSDOptions) -> Array2<f32> {
     let mut layer_id = 0;
@@ -323,7 +343,6 @@ fn ssd_generate_anchors(opts: &SSDOptions) -> Array2<f32> {
     let anchor_offset_x = opts.anchor_offset_x;
     let anchor_offset_y = opts.anchor_offset_y;
     let interpolated_scale_aspect_ratio = opts.interpolated_scale_aspect_ratio;
-
     let mut anchors = Vec::new();
 
     while layer_id < num_layers {
@@ -349,7 +368,6 @@ fn ssd_generate_anchors(opts: &SSDOptions) -> Array2<f32> {
                 }
             }
         }
-
         layer_id = last_same_stride_layer;
     }
 
@@ -360,7 +378,6 @@ fn ssd_generate_anchors(opts: &SSDOptions) -> Array2<f32> {
         anchors_array[[i, 0]] = x;
         anchors_array[[i, 1]] = y;
     }
-
     anchors_array
 }
 
@@ -370,12 +387,16 @@ mod tests {
 
     #[test]
     fn test_face_detection() {
-        let model = match FaceDetection::new(FaceDetectionModel::BackCamera, None) {
-            Ok(model) => {model}
+        let face_detection = match FaceDetection::new(FaceDetectionModel::BackCamera, None) {
+            Ok(face_detection) => {face_detection}
             Err(e) => {
                 println!("{:?}", e);
                 return
             }
         };
+
+        let im_bytes: &[u8] = include_bytes!("/home/tripg/Documents/face/datnt.jpg");
+
+        face_detection.infer(im_bytes).unwrap();
     }
 }
