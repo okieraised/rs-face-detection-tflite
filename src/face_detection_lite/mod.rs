@@ -1,6 +1,8 @@
 pub mod types;
 mod transform;
 mod nms;
-mod face_detection;
+pub mod face_detection;
 mod utils;
 mod render;
+mod face_landmark;
+mod iris_landmark;

@@ -1,7 +1,7 @@
 use anyhow::Error;
 use opencv::core::{Mat, MatTraitConst};
 use opencv::imgcodecs::{imdecode, IMREAD_COLOR, IMREAD_UNCHANGED};
-use opencv::imgproc::{cvt_color, COLOR_BGR2RGB, COLOR_RGBA2RGB, COLOR_GRAY2RGB};
+use opencv::imgproc::{cvt_color, COLOR_BGR2RGB, COLOR_GRAY2RGB, COLOR_RGBA2RGB};
 
 pub fn convert_image_to_mat(im_bytes: &[u8]) -> Result<Mat, Error> {
     // Convert bytes to Mat

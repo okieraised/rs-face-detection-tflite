@@ -1,4 +1,4 @@
-use ndarray::{Array2, ArrayD, IxDyn, s};
+use ndarray::{s, Array, Array1, Array2, ArrayD, IxDyn, Zip};
 use std::slice::Iter;
 
 #[derive(Debug, Clone)]
@@ -7,7 +7,7 @@ pub struct ImageTensor {
     /// The data may contain an extra dimension for batching (the default).
     pub tensor_data: ArrayD<f32>, // ArrayD represents a dynamic-dimensional array in Rust.
     pub padding: (f64, f64, f64, f64), // Tuple for padding (left, top, right, bottom).
-    pub original_size: (i32, i32), // Tuple for the original image size (width, height).
+    pub original_size: (i32, i32),     // Tuple for the original image size (width, height).
 }
 
 impl ImageTensor {
@@ -20,8 +20,8 @@ impl ImageTensor {
     }
 }
 
-
 use std::f32::consts::PI;
+use std::ops::Mul;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
@@ -66,11 +66,7 @@ impl Rect {
             return *self;
         }
 
-        let (sx, sy) = if normalize {
-            (1.0 / size.0, 1.0 / size.1)
-        } else {
-            size
-        };
+        let (sx, sy) = if normalize { (1.0 / size.0, 1.0 / size.1) } else { size };
 
         Rect {
             x_center: self.x_center * sx,
@@ -86,12 +82,7 @@ impl Rect {
     pub fn points(&self) -> Vec<(f64, f64)> {
         let (x, y) = (self.x_center, self.y_center);
         let (w, h) = (self.width / 2.0, self.height / 2.0);
-        let mut pts = vec![
-            (x - w, y - h),
-            (x + w, y - h),
-            (x + w, y + h),
-            (x - w, y + h),
-        ];
+        let mut pts = vec![(x - w, y - h), (x + w, y - h), (x + w, y + h), (x - w, y + h)];
 
         if self.rotation != 0.0 {
             let s = self.rotation.sin();
@@ -118,12 +109,7 @@ pub struct BBox {
 impl BBox {
     /// Create a new BBox
     pub fn new(xmin: f64, ymin: f64, xmax: f64, ymax: f64) -> Self {
-        Self {
-            xmin,
-            ymin,
-            xmax,
-            ymax,
-        }
+        Self { xmin, ymin, xmax, ymax }
     }
 
     /// Return the box as a tuple (xmin, ymin, xmax, ymax)
@@ -212,7 +198,7 @@ impl Detection {
     /// Create a new Detection
     pub fn new(data: Vec<f32>, score: f32) -> Self {
         assert!(data.len() >= 4, "Data must contain at least four elements for the bounding box");
-        let shape = (data.len() /  2, 2);
+        let shape = (data.len() / 2, 2);
         let reshaped_data: Array2<f32> = Array2::from_shape_vec(shape, data).unwrap();
 
         Self {
@@ -231,7 +217,6 @@ impl Detection {
         (row[0], row[1])
     }
 
-
     // Get bounding box
     pub fn bbox(&self) -> BBox {
         let xmin = self.data[[0, 0]] as f64;
@@ -247,6 +232,16 @@ impl Detection {
 
         Detection {
             data: scaled_data,
+            score: self.score,
+        }
+    }
+
+    pub fn scaled_by_image_size(&self, image_size: (i32, i32)) -> Detection {
+        let mut result = self.data.clone();
+        let scale = Array2::<f32>::from_shape_vec((1, 2), vec![image_size.0 as f32, image_size.1 as f32]).unwrap();
+        let result = result.mul(scale);
+        Detection {
+            data: result,
             score: self.score,
         }
     }
