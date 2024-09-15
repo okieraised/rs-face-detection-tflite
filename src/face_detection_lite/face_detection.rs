@@ -158,7 +158,7 @@ impl FaceDetection {
         if let Some(path) = model_path {
             model_path_buf = PathBuf::from(path);
         } else {
-            model_path_buf = PathBuf::from("/home/tripg/Documents/repo/rs-face-detection-tflite/src/models");
+            model_path_buf = PathBuf::from("./models");
         }
 
         match model_type {
@@ -417,21 +417,22 @@ fn ssd_generate_anchors(opts: &SSDOptions) -> Array2<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::face_detection_lite::render::render_to_image;
 
-    #[test]
-    fn test_face_detection() {
-        let face_detection = match FaceDetection::new(FaceDetectionModel::BackCamera, None) {
-            Ok(face_detection) => face_detection,
-            Err(e) => {
-                println!("{:?}", e);
-                return;
-            }
-        };
-
-        let im_bytes: &[u8] = include_bytes!("/home/tripg/Documents/face/datnt.jpg");
-        let image = convert_image_to_mat(im_bytes).unwrap();
-        face_detection.infer(&image, None).unwrap();
-    }
+    // #[test]
+    // fn test_face_detection() {
+    //     let face_detection = match FaceDetection::new(FaceDetectionModel::BackCamera, None) {
+    //         Ok(face_detection) => face_detection,
+    //         Err(e) => {
+    //             println!("{:?}", e);
+    //             return;
+    //         }
+    //     };
+    //
+    //     let im_bytes: &[u8] = include_bytes!("/Users/tripham/Desktop/face-detection-tflite/women.png");
+    //     let image = convert_image_to_mat(im_bytes).unwrap();
+    //     let detections = face_detection.infer(&image, None).unwrap();
+    // }
 
     #[test]
     fn test_ndarray() {

@@ -24,7 +24,6 @@ use tflite::{FlatBufferModel, InterpreterBuilder};
 ///     Vision for Augmented and Virtual Reality, Long Beach,
 ///     CA, USA, 2019
 
-
 const MODEL_NAME: &str = "face_landmark.tflite";
 const NUM_DIMS: i32 = 3;
 const NUM_LANDMARKS: i32 = 468;
@@ -33,7 +32,7 @@ const DETECTION_THRESHOLD: f32 = 0.5;
 
 /// face landmark connections
 /// (from face_landmarks_to_render_data_calculator.cc)
-const FACE_LANDMARK_CONNECTIONS: [(i32, i32); 124] = [
+pub const FACE_LANDMARK_CONNECTIONS: [(i32, i32); 124] = [
     // Lips.
     (61, 146),
     (146, 91),
@@ -210,8 +209,7 @@ impl FaceLandmark {
         if let Some(path) = model_path {
             model_path_buf = PathBuf::from(path);
         } else {
-            model_path_buf =
-                PathBuf::from("/home/tripg/Documents/repo/rs-face-detection-tflite/src/models/face_landmark.tflite");
+            model_path_buf = PathBuf::from("./models/face_landmark.tflite");
         }
         let model = FlatBufferModel::build_from_file(model_path_buf.clone())?;
 
@@ -347,9 +345,12 @@ mod tests {
 
     #[test]
     fn test_face_landmark() {
-        let face_detection = FaceDetection::new(FaceDetectionModel::BackCamera, None).unwrap();
+        let face_detection = FaceDetection::new(
+            FaceDetectionModel::BackCamera,
+            Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models".to_string()),
+        ).unwrap();
 
-        let im_bytes: &[u8] = include_bytes!("/home/tripg/Documents/face/datnt.jpg");
+        let im_bytes: &[u8] = include_bytes!("/Users/tripham/Downloads/man.jpg");
         let image = convert_image_to_mat(im_bytes).unwrap();
         let img_shape = image.size().unwrap();
 
@@ -357,7 +358,9 @@ mod tests {
 
         let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height)).unwrap();
 
-        let face_landmark = FaceLandmark::new(None).unwrap();
-        face_landmark.infer(&image, Some(face_roi));
+        let face_landmark = FaceLandmark::new(
+            Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models/face_landmark.tflite".to_string()),
+        ).unwrap();
+        let lmks = face_landmark.infer(&image, Some(face_roi)).unwrap();
     }
 }

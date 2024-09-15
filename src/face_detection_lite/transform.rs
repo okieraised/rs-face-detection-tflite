@@ -1,18 +1,17 @@
 use crate::face_detection_lite::types::{BBox, Detection, ImageTensor, Landmark, Rect};
 use anyhow::Error;
-use image::{GenericImageView};
-use ndarray::{Array2, Array4, Axis, s};
-use ndarray::{Array3};
+use image::GenericImageView;
+use ndarray::Array3;
+use ndarray::{s, Array2, Array4, Axis};
 use opencv::core::{copy_make_border, flip, Point2f, Scalar, Size, Vec3b, Vector, BORDER_CONSTANT};
 use opencv::imgproc::{resize, INTER_LINEAR};
 use opencv::{imgproc, prelude::*};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
-use std::ops::{Add};
+use std::ops::Add;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeMode {
-    /// Keep width and height as calculated.
     Default = 0,
 
     /// Make square using `max(width, height)`.
@@ -139,7 +138,6 @@ pub fn detection_letterbox_removal(detections: Vec<Detection>, padding: (f64, f6
         .map(|detection| adjust_data(&detection, left as f32, top as f32, h_scale as f32, v_scale as f32))
         .collect()
 }
-
 
 /// Return the bounding box that encloses all landmarks in a given list.
 /// This function combines the MediaPipe nodes LandmarksToDetectionCalculator and DetectionToRectCalculator.
@@ -325,11 +323,11 @@ fn perspective_transform_coeff(src_points: &Vec<(f32, f32)>, dst_points: &Vec<(f
     let mut matrix = Vec::with_capacity(8 * 8);
     let mut b = Vec::with_capacity(8);
 
-    for ((x, y), (X, Y)) in dst_points.iter().zip(src_points.iter()) {
-        matrix.push(vec![*x, *y, 1.0, 0.0, 0.0, 0.0, -X * x, -X * y]);
-        matrix.push(vec![0.0, 0.0, 0.0, *x, *y, 1.0, -Y * x, -Y * y]);
-        b.push(*X);
-        b.push(*Y);
+    for ((x, y), (x2, y2)) in dst_points.iter().zip(src_points.iter()) {
+        matrix.push(vec![*x, *y, 1.0, 0.0, 0.0, 0.0, -x2 * x, -x2 * y]);
+        matrix.push(vec![0.0, 0.0, 0.0, *x, *y, 1.0, -y2 * x, -y2 * y]);
+        b.push(*x2);
+        b.push(*y2);
     }
 
     let flat_matrix: Vec<f32> = matrix.into_iter().flatten().collect();
@@ -431,5 +429,5 @@ pub fn project_landmarks(
         .outer_iter()
         .map(|p| Landmark::new(p[0] as f64, p[1] as f64, p[2] as f64))
         .collect();
-    return Ok(landmark);
+    Ok(landmark)
 }

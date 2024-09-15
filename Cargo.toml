@@ -2,6 +2,9 @@
 name = "rs-face-detection-tflite"
 version = "0.1.0"
 edition = "2021"
+authors = ["Thomas Pham <phamtri2895@gmail.com>"]
+description = "A tensorflow lite in Rust"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 ndarray = { version = "0.16.1", features = ["rayon"] }

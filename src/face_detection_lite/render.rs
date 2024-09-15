@@ -1,7 +1,7 @@
 use crate::face_detection_lite::types::{Detection, Landmark};
 use anyhow::Error;
-use image::{DynamicImage, GenericImageView};
-use imageproc::drawing::{draw_filled_rect_mut, draw_line_segment_mut};
+use image::{DynamicImage, GenericImageView, Rgb, Rgba};
+use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect, draw_hollow_rect_mut, draw_line_segment_mut};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
@@ -358,19 +358,8 @@ pub fn landmarks_to_render_data(
     }
 }
 
-// pub fn render_to_image(annotations: Vec<Annotation>, image: &Mat, blend: Option<bool>) {
-//     let blend_mode = blend.unwrap_or(false);
-//
-// }
-
-pub fn render_to_image(
-    annotations: &Vec<Annotation>,
-    image: &DynamicImage,
-    blend_mode: Option<bool>,
-) -> DynamicImage {
-
+pub fn render_to_image(annotations: &Vec<Annotation>, image: &DynamicImage, blend_mode: Option<bool>) -> DynamicImage {
     let blend = blend_mode.unwrap_or(false);
-
 
     let (width, height) = image.dimensions();
     let mut img = image.to_rgba8();
@@ -381,41 +370,38 @@ pub fn render_to_image(
             let scale_y = height as f64;
             let scaled_thickness = annotation.thickness;
             let scaled_color = annotation.color.clone();
-            let scaled_data = annotation.data.iter()
+            let scaled_data = annotation
+                .data
+                .iter()
                 .map(|item| match item {
-                    AnnotationData::Point(p) => {
-                        AnnotationData::Point(Point { x: p.x * scale_x, y: p.y * scale_y })
-                    },
-                    AnnotationData::RectOrOval(r) => {
-                        AnnotationData::RectOrOval(RectOrOval {
-                            left: r.left * scale_x,
-                            top: r.top * scale_y,
-                            right: r.right * scale_x,
-                            bottom: r.bottom * scale_y,
-                            oval: r.oval,
-                        })
-                    },
-                    AnnotationData::FilledRectOrOval(f) => {
-                        AnnotationData::FilledRectOrOval(FilledRectOrOval {
-                            rect: RectOrOval {
-                                left: f.rect.left * scale_x,
-                                top: f.rect.top * scale_y,
-                                right: f.rect.right * scale_x,
-                                bottom: f.rect.bottom * scale_y,
-                                oval: f.rect.oval,
-                            },
-                            fill: f.fill.clone(),
-                        })
-                    },
-                    AnnotationData::Line(l) => {
-                        AnnotationData::Line(Line {
-                            x_start: l.x_start * scale_x,
-                            y_start: l.y_start * scale_y,
-                            x_end: l.x_end * scale_x,
-                            y_end: l.y_end * scale_y,
-                            dashed: l.dashed,
-                        })
-                    },
+                    AnnotationData::Point(p) => AnnotationData::Point(Point {
+                        x: p.x * scale_x,
+                        y: p.y * scale_y,
+                    }),
+                    AnnotationData::RectOrOval(r) => AnnotationData::RectOrOval(RectOrOval {
+                        left: r.left * scale_x,
+                        top: r.top * scale_y,
+                        right: r.right * scale_x,
+                        bottom: r.bottom * scale_y,
+                        oval: r.oval,
+                    }),
+                    AnnotationData::FilledRectOrOval(f) => AnnotationData::FilledRectOrOval(FilledRectOrOval {
+                        rect: RectOrOval {
+                            left: f.rect.left * scale_x,
+                            top: f.rect.top * scale_y,
+                            right: f.rect.right * scale_x,
+                            bottom: f.rect.bottom * scale_y,
+                            oval: f.rect.oval,
+                        },
+                        fill: f.fill.clone(),
+                    }),
+                    AnnotationData::Line(l) => AnnotationData::Line(Line {
+                        x_start: l.x_start * scale_x,
+                        y_start: l.y_start * scale_y,
+                        x_end: l.x_end * scale_x,
+                        y_end: l.y_end * scale_y,
+                        dashed: l.dashed,
+                    }),
                 })
                 .collect::<Vec<_>>();
 
@@ -438,30 +424,47 @@ pub fn render_to_image(
                     let w = (thickness / 2).max(1);
                     let x = p.x as u32;
                     let y = p.y as u32;
-                    let rect = imageproc::rect::Rect::at((x - w) as i32, (y - w) as i32)
-                        .of_size(w * 2, w * 2);
-                    draw_filled_rect_mut(&mut img, rect, color);
-                },
+                    let rect = imageproc::rect::Rect::at((x - w) as i32, (y - w) as i32).of_size(w * 2, w * 2);
+                    draw_filled_rect_mut(
+                        &mut img,
+                        rect,
+                        Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                    );
+                }
                 AnnotationData::Line(l) => {
                     let x_start = l.x_start as i32;
                     let y_start = l.y_start as i32;
                     let x_end = l.x_end as i32;
                     let y_end = l.y_end as i32;
-                    draw_line_segment_mut(&mut img, (x_start as f32, y_start as f32), (x_end as f32, y_end as f32), color);
-                },
+                    draw_line_segment_mut(
+                        &mut img,
+                        (x_start as f32, y_start as f32),
+                        (x_end as f32, y_end as f32),
+                        Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                    );
+                }
                 AnnotationData::RectOrOval(r) => {
                     let rect = imageproc::rect::Rect::at(r.left as i32, r.top as i32)
                         .of_size((r.right - r.left) as u32, (r.bottom - r.top) as u32);
                     if r.oval {
-                        draw_filled_rect_mut(&mut img, rect, color);
+                        draw_hollow_rect_mut(
+                            &mut img,
+                            rect,
+                            Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                        );
                     } else {
-                        draw_filled_rect_mut(&mut img, rect, color);
+                        draw_hollow_rect_mut(
+                            &mut img,
+                            rect,
+                            Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                        );
                     }
-                },
+                }
                 AnnotationData::FilledRectOrOval(f) => {
                     let rect = imageproc::rect::Rect::at(f.rect.left as i32, f.rect.top as i32)
                         .of_size((f.rect.right - f.rect.left) as u32, (f.rect.bottom - f.rect.top) as u32);
-                    let fill_color = f.fill.to_rgba();
+                    let fill_color =
+                        Rgba::from([f.fill.r as u8, f.fill.g as u8, f.fill.b as u8, f.fill.a.unwrap_or(3) as u8]);
                     if f.rect.oval {
                         draw_filled_rect_mut(&mut img, rect, fill_color);
                     } else {
