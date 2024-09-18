@@ -1,7 +1,6 @@
 use crate::face_detection_lite::nms::non_maximum_suppression;
 use crate::face_detection_lite::transform::{detection_letterbox_removal, image_to_tensor, sigmoid};
 use crate::face_detection_lite::types::{Detection, Rect};
-use crate::face_detection_lite::utils::convert_image_to_mat;
 use anyhow::Error;
 use ndarray::parallel::prelude::*;
 use ndarray::{s, Array, Array2, Array3, Axis};
@@ -446,7 +445,6 @@ mod tests {
             [0.27929265, 0.49235079],
             [0.71279182, 0.48242962],
         ]);
-        println!("test_arr: {:?}", test_arr);
 
         let mut res: Vec<(f32, f32)> = Vec::new();
 
@@ -454,6 +452,5 @@ mod tests {
             let x = test_arr.row(row);
             res.push((x[0], x[1]));
         }
-        println!("res: {:?}", res);
     }
 }

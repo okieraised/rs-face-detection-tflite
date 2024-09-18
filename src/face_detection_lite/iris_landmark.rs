@@ -62,175 +62,40 @@ pub const EYE_LANDMARK_CONNECTIONS: [(i32, i32); 15] = [
 const MAX_EYE_LANDMARK: usize = EYE_LANDMARK_CONNECTIONS.len();
 
 pub const LEFT_EYE_TO_FACE_LANDMARK_INDEX: [i32; 71] = [
-    /// eye lower contour
-    33,
-    7,
-    163,
-    144,
-    145,
-    153,
-    154,
-    155,
-    133,
-    /// eye upper contour excluding corners
-    246,
-    161,
-    160,
-    159,
-    158,
-    157,
-    173,
-    /// halo x2 lower contour
-    130,
-    25,
-    110,
-    24,
-    23,
-    22,
-    26,
-    112,
-    243,
-    /// halo x2 upper contour excluding corners
-    247,
-    30,
-    29,
-    27,
-    28,
-    56,
-    190,
-    /// halo x3 lower contour
-    226,
-    31,
-    228,
-    229,
-    230,
-    231,
-    232,
-    233,
-    244,
-    /// halo x3 upper contour excluding corners
-    113,
-    225,
-    224,
-    223,
-    222,
-    221,
-    189,
-    /// halo x4 upper contour (no upper due to mesh structure)
-    /// or eyebrow inner contour
-    35,
-    124,
-    46,
-    53,
-    52,
-    65,
-    /// halo x5 lower contour
-    143,
-    111,
-    117,
-    118,
-    119,
-    120,
-    121,
-    128,
-    245,
-    /// halo x5 upper contour excluding corners or eyebrow outer contour
-    156,
-    70,
-    63,
-    105,
-    66,
-    107,
-    55,
-    193,
+    // eye lower contour
+    33, 7, 163, 144, 145, 153, 154, 155, 133, // eye upper contour excluding corners
+    246, 161, 160, 159, 158, 157, 173, // halo x2 lower contour
+    130, 25, 110, 24, 23, 22, 26, 112, 243, // halo x2 upper contour excluding corners
+    247, 30, 29, 27, 28, 56, 190, // halo x3 lower contour
+    226, 31, 228, 229, 230, 231, 232, 233, 244, // halo x3 upper contour excluding corners
+    113, 225, 224, 223, 222, 221, 189,
+    // halo x4 upper contour (no upper due to mesh structure)
+    // or eyebrow inner contour
+    35, 124, 46, 53, 52, 65, // halo x5 lower contour
+    143, 111, 117, 118, 119, 120, 121, 128, 245,
+    // halo x5 upper contour excluding corners or eyebrow outer contour
+    156, 70, 63, 105, 66, 107, 55, 193,
 ];
 
 pub const RIGHT_EYE_TO_FACE_LANDMARK_INDEX: [i32; 71] = [
     /// eye lower contour
-    263,
-    249,
-    390,
-    373,
-    374,
-    380,
-    381,
-    382,
-    362,
-    /// eye upper contour excluding corners
-    466,
-    388,
-    387,
-    386,
-    385,
-    384,
-    398,
-    /// halo x2 lower contour
-    359,
-    255,
-    339,
-    254,
-    253,
-    252,
-    256,
-    341,
-    463,
-    /// halo x2 upper contour excluding corners
-    467,
-    260,
-    259,
-    257,
-    258,
-    286,
-    414,
-    /// halo x3 lower contour
-    446,
-    261,
-    448,
-    449,
-    450,
-    451,
-    452,
-    453,
-    464,
-    /// halo x3 upper contour excluding corners
-    342,
-    445,
-    444,
-    443,
-    442,
-    441,
-    413,
-    /// halo x4 upper contour (no upper due to mesh structure)
-    /// or eyebrow inner contour
-    265,
-    353,
-    276,
-    283,
-    282,
-    295,
-    /// halo x5 lower contour
-    372,
-    340,
-    346,
-    347,
-    348,
-    349,
-    350,
-    357,
-    465,
-    /// halo x5 upper contour excluding corners or eyebrow outer contour
-    383,
-    300,
-    293,
-    334,
-    296,
-    336,
-    285,
-    417,
+    263, 249, 390, 373, 374, 380, 381, 382, 362,
+    // eye upper contour excluding corners
+    466, 388, 387, 386, 385, 384, 398, // halo x2 lower contour
+    359, 255, 339, 254, 253, 252, 256, 341, 463, // halo x2 upper contour excluding corners
+    467, 260, 259, 257, 258, 286, 414, // halo x3 lower contour
+    446, 261, 448, 449, 450, 451, 452, 453, 464, // halo x3 upper contour excluding corners
+    342, 445, 444, 443, 442, 441, 413,
+    // halo x4 upper contour (no upper due to mesh structure)
+    // or eyebrow inner contour
+    265, 353, 276, 283, 282, 295, // halo x5 lower contour
+    372, 340, 346, 347, 348, 349, 350, 357, 465,
+    // halo x5 upper contour excluding corners or eyebrow outer contour
+    383, 300, 293, 334, 296, 336, 285, 417,
 ];
 
-// /// 35mm camera sensor diagonal (36mm * 24mm)
-// const SENSOR_DIAGONAL_35MM: f64 = 1872_f64.sqrt();
+/// 35mm camera sensor diagonal (36mm * 24mm)
+/// const SENSOR_DIAGONAL_35MM: f64 = 1872_f64.sqrt();
 /// average human iris size
 const IRIS_SIZE_IN_MM: f64 = 11.8;
 
@@ -577,28 +442,17 @@ mod tests {
 
     #[test]
     fn test_face_landmark() {
-        let face_detection = FaceDetection::new(
-            FaceDetectionModel::BackCamera,
-            Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models".to_string()),
-        ).unwrap();
-        let im_bytes: &[u8] = include_bytes!("/Users/tripham/Desktop/face-detection-tflite/women.png");
+        let face_detection = FaceDetection::new(FaceDetectionModel::BackCamera, None).unwrap();
+        let im_bytes: &[u8] = include_bytes!("../../test_data/man.jpg");
         let image = convert_image_to_mat(im_bytes).unwrap();
         let img_shape = image.size().unwrap();
         let faces = face_detection.infer(&image, None).unwrap();
         let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height)).unwrap();
-        let face_landmark = FaceLandmark::new(
-            Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models/face_landmark.tflite".to_string()),
-        ).unwrap();
+        let face_landmark = FaceLandmark::new(None).unwrap();
         let lmks = face_landmark.infer(&image, Some(face_roi)).unwrap();
-
         let (left_eye_roi, right_eye_roi) =
             iris_roi_from_face_landmarks(lmks, (img_shape.width, img_shape.height)).unwrap();
-        let iris_landmark = IrisLandmark::new(
-            Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models/iris_landmark.tflite".to_string()),
-        )
-        .unwrap();
-
-        // iris_landmark.infer(&image, Some(left_eye_roi), Some(false)).unwrap();
+        let iris_landmark = IrisLandmark::new(None).unwrap();
         iris_landmark
             .infer(&image, Some(right_eye_roi), Some(true))
             .unwrap();

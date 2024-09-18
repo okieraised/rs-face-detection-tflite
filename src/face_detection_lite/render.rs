@@ -428,7 +428,7 @@ pub fn render_to_image(annotations: &Vec<Annotation>, image: &DynamicImage, blen
                     draw_filled_rect_mut(
                         &mut img,
                         rect,
-                        Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                        Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(255) as u8]),
                     );
                 }
                 AnnotationData::Line(l) => {
@@ -440,7 +440,7 @@ pub fn render_to_image(annotations: &Vec<Annotation>, image: &DynamicImage, blen
                         &mut img,
                         (x_start as f32, y_start as f32),
                         (x_end as f32, y_end as f32),
-                        Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                        Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(255) as u8]),
                     );
                 }
                 AnnotationData::RectOrOval(r) => {
@@ -450,13 +450,13 @@ pub fn render_to_image(annotations: &Vec<Annotation>, image: &DynamicImage, blen
                         draw_hollow_rect_mut(
                             &mut img,
                             rect,
-                            Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                            Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(255) as u8]),
                         );
                     } else {
                         draw_hollow_rect_mut(
                             &mut img,
                             rect,
-                            Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(3) as u8]),
+                            Rgba::from([color.r as u8, color.g as u8, color.b as u8, color.a.unwrap_or(255) as u8]),
                         );
                     }
                 }
@@ -464,7 +464,7 @@ pub fn render_to_image(annotations: &Vec<Annotation>, image: &DynamicImage, blen
                     let rect = imageproc::rect::Rect::at(f.rect.left as i32, f.rect.top as i32)
                         .of_size((f.rect.right - f.rect.left) as u32, (f.rect.bottom - f.rect.top) as u32);
                     let fill_color =
-                        Rgba::from([f.fill.r as u8, f.fill.g as u8, f.fill.b as u8, f.fill.a.unwrap_or(3) as u8]);
+                        Rgba::from([f.fill.r as u8, f.fill.g as u8, f.fill.b as u8, f.fill.a.unwrap_or(255) as u8]);
                     if f.rect.oval {
                         draw_filled_rect_mut(&mut img, rect, fill_color);
                     } else {

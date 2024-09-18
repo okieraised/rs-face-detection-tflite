@@ -1,4 +1,5 @@
 use ndarray::{s, Array, Array1, Array2, ArrayD, IxDyn, Zip};
+use std::ops::Mul;
 use std::slice::Iter;
 
 #[derive(Debug, Clone)]
@@ -19,9 +20,6 @@ impl ImageTensor {
         }
     }
 }
-
-use std::f32::consts::PI;
-use std::ops::Mul;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {

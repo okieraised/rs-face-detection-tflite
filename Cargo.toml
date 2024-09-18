@@ -9,8 +9,8 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 ndarray = { version = "0.16.1", features = ["rayon"] }
 image = "0.25.2"
-opencv = {  version = "0.92.3" ,  features = ["clang-runtime"] }
-anyhow = "1.0.86"
+opencv = {  version = "0.93.0",  features = ["clang-runtime"] }
+anyhow = "1.0.89"
 tflite = "0.9.8"
 nalgebra = "0.33.0"
 bytemuck = "1.18.0"

@@ -345,12 +345,9 @@ mod tests {
 
     #[test]
     fn test_face_landmark() {
-        let face_detection = FaceDetection::new(
-            FaceDetectionModel::BackCamera,
-            Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models".to_string()),
-        ).unwrap();
+        let face_detection = FaceDetection::new(FaceDetectionModel::BackCamera, None).unwrap();
 
-        let im_bytes: &[u8] = include_bytes!("/Users/tripham/Downloads/man.jpg");
+        let im_bytes: &[u8] = include_bytes!("../../test_data/man.jpg");
         let image = convert_image_to_mat(im_bytes).unwrap();
         let img_shape = image.size().unwrap();
 
@@ -358,9 +355,7 @@ mod tests {
 
         let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height)).unwrap();
 
-        let face_landmark = FaceLandmark::new(
-            Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models/face_landmark.tflite".to_string()),
-        ).unwrap();
+        let face_landmark = FaceLandmark::new(None).unwrap();
         let lmks = face_landmark.infer(&image, Some(face_roi)).unwrap();
     }
 }
