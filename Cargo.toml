@@ -16,6 +16,12 @@ nalgebra = "0.33.0"
 bytemuck = "1.18.0"
 imageproc = "0.25.0"
 
+[[example]]
+name = "face_detection"
+
+[[example]]
+name = "face_landmark"
+
 [lib]
 name = "rs_face_detection_tfite"
 

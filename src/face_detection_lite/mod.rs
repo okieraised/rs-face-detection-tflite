@@ -1,8 +1,8 @@
 pub mod types;
 mod transform;
 mod nms;
-pub(crate) mod face_detection;
-pub(crate) mod utils;
-pub(crate) mod render;
-pub(crate) mod face_landmark;
-pub(crate) mod iris_landmark;
+pub mod face_detection;
+pub mod utils;
+pub mod render;
+pub mod face_landmark;
+pub mod iris_landmark;

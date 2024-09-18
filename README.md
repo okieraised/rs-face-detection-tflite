@@ -19,38 +19,27 @@ The package provides the following models:
 
 To run the detection:
 ```rust
-let face_detection = FaceDetection::new(
-    FaceDetectionModel::BackCamera,
-    Some("/Users/tripham/Desktop/rs-face-detection-tflite/src/models".to_string()),
-)
-.unwrap();
+let face_detection = FaceDetection::new(FaceDetectionModel::BackCamera, None).unwrap();
 
-let im_bytes: &[u8] = include_bytes!("/Users/tripham/Downloads/man.jpg");
+// test data
+let im_bytes: &[u8] = include_bytes!("../test_data/man.jpg");
 let image = convert_image_to_mat(im_bytes).unwrap();
 let img_shape = image.size().unwrap();
 
+// Face detection
 let faces = face_detection.infer(&image, None).unwrap();
-
 let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height)).unwrap();
 
-let render_data = detections_to_render_data(
-    faces,
-    Some(Colors::GREEN),
-    None,
-    4,
-    2,
-    true,
-    None,
-);
+// Face landmark
+let face_landmark = FaceLandmark::new(None).unwrap();
+let lmks = face_landmark.infer(&image, Some(face_roi)).unwrap();
 
-let img = ImageReader::open("/Users/tripham/Downloads/man.jpg")
-            .unwrap()
-            .decode()
-            .unwrap();
+// Face irises
+let (left_eye_roi, right_eye_roi) = iris_roi_from_face_landmarks(lmks.clone(), (img_shape.width, img_shape.height)).unwrap();
+let iris_landmark = IrisLandmark::new(None).unwrap();
 
-let res = render_to_image(&render_data, &img, None);
-res.save("/Users/tripham/Downloads/test_man.png").unwrap();
-
+let right_iris_lmk = iris_landmark.infer(&image, Some(right_eye_roi), Some(true)).unwrap();
+let left_iris_lmk = iris_landmark.infer(&image, Some(left_eye_roi), Some(false)).unwrap();
 ```
 
 ## Installation

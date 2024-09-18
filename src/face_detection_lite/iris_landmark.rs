@@ -133,7 +133,7 @@ impl IrisResults {
 /// a 25% margin around the eye.
 /// The outputs of the model are 71 normalized eye contour landmarks and a
 /// separate list of 5 normalized iris landmarks.
-pub(crate) struct IrisLandmark {
+pub struct IrisLandmark {
     model_path: PathBuf,
     model: FlatBufferModel,
 }

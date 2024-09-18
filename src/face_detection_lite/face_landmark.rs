@@ -195,7 +195,7 @@ pub fn face_detection_to_roi(face_detection: Detection, image_size: (i32, i32)) 
     roi
 }
 
-pub(crate) struct FaceLandmark {
+pub struct FaceLandmark {
     model_path: PathBuf,
     model: FlatBufferModel,
 }

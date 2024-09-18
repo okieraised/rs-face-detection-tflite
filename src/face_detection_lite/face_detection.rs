@@ -143,7 +143,7 @@ const MIN_SUPPRESSION_THRESHOLD: f32 = 0.3;
 /// Each detection contains the normalised [0,1] position and size of the
 /// detected face, as well as a number of keypoints (also normalised to
 /// [0,1]).
-pub(crate) struct FaceDetection {
+pub struct FaceDetection {
     model_path: PathBuf,
     model: FlatBufferModel,
     anchors: Array2<f32>,
