@@ -9,12 +9,11 @@ mod tests {
     use crate::face_detection_lite::iris_landmark::{
         eye_landmarks_to_render_data, iris_landmarks_to_render_data, iris_roi_from_face_landmarks, IrisLandmark,
     };
-    use crate::face_detection_lite::render::{
-        detections_to_render_data, landmarks_to_render_data, render_to_image, Colors,
-    };
+    use crate::face_detection_lite::render::{detections_to_render_data, landmarks_to_render_data, render_to_image, Colors, Annotation};
     use crate::face_detection_lite::utils::convert_image_to_mat;
     use image::ImageReader;
     use opencv::core::MatTraitConst;
+    use crate::face_detection_lite::types::Landmark;
 
     #[test]
     fn test_face_landmark() {
@@ -37,7 +36,8 @@ mod tests {
         let (left_eye_roi, right_eye_roi) = iris_roi_from_face_landmarks(lmks.clone(), (img_shape.width, img_shape.height)).unwrap();
         let iris_landmark = IrisLandmark::new(None).unwrap();
 
-        let iris_lmk = iris_landmark.infer(&image, Some(right_eye_roi), Some(true)).unwrap();
+        let right_iris_lmk = iris_landmark.infer(&image, Some(right_eye_roi), Some(true)).unwrap();
+        let left_iris_lmk = iris_landmark.infer(&image, Some(left_eye_roi), Some(false)).unwrap();
 
         // Draw face bounding box
         let render_data = detections_to_render_data(
@@ -63,16 +63,23 @@ mod tests {
         let res = render_to_image(&annotations, &img, None);
         res.save("./assets/man_landmark.png").unwrap();
 
-        // let irs_lmk = eye_landmarks_to_render_data(
-        //     iris_lmk.eyeball_contour(),
-        //     Colors::RED, Colors::RED, Some(2.0), None,
-        // );
-        // let img = ImageReader::open("/Users/tripham/Downloads/man.jpg")
-        //     .unwrap()
-        //     .decode()
-        //     .unwrap();
-        //
-        // let res = render_to_image(&irs_lmk, &img, None);
-        // res.save("/Users/tripham/Downloads/man_iris.png").unwrap();
+
+        let right_iris_lmk = eye_landmarks_to_render_data(
+            right_iris_lmk.eyeball_contour(),
+            Colors::RED, Colors::RED, Some(2.0), None,
+        );
+
+        let left_iris_lmk = eye_landmarks_to_render_data(
+            left_iris_lmk.eyeball_contour(),
+            Colors::RED, Colors::RED, Some(2.0), None,
+        );
+
+        let mut iris_lmks: Vec<Annotation> = Vec::new();
+        iris_lmks.extend(right_iris_lmk);
+        iris_lmks.extend(left_iris_lmk);
+
+
+        let res = render_to_image(&iris_lmks, &img, None);
+        res.save("./assets/man_iris.png").unwrap();
     }
 }

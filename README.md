@@ -15,6 +15,7 @@ The package provides the following models:
     [Example](assets/man_landmark.png)
 
 * Iris Landmark Detection
+    [Example](assets/man_iris.png)
 
 To run the detection:
 ```rust
