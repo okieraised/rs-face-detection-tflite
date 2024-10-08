@@ -9,13 +9,13 @@ Rust using OpenCV and rust-ndarray.
 The package provides the following models:
 
 * Face Detection
-    [Example](assets/man_bbox.png)
+    ![Example](https://github.com/okieraised/rs-face-detection-tflite/blob/main/assets/man_bbox.png)
 
 * Face Landmark Detection
-    [Example](assets/man_landmark.png)
+    ![Example](https://github.com/okieraised/rs-face-detection-tflite/blob/main/assets/man_landmark.png)
 
 * Iris Landmark Detection
-    [Example](assets/man_iris.png)
+    ![Example](https://github.com/okieraised/rs-face-detection-tflite/blob/main/assets/man_iris.png)
 
 To run the detection:
 ```rust
