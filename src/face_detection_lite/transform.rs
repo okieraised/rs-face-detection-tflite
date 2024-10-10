@@ -1,3 +1,4 @@
+use std::default;
 use crate::face_detection_lite::types::{BBox, Detection, ImageTensor, Landmark, Rect};
 use anyhow::Error;
 use image::GenericImageView;
@@ -9,6 +10,7 @@ use opencv::{imgproc, prelude::*};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::ops::Add;
+use opencv::imgcodecs::imwrite;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeMode {
@@ -289,6 +291,8 @@ pub fn image_to_tensor(
     let min_val = output_range.0;
     let max_val = output_range.1;
     let img_shape = roi_image.size()?;
+
+    imwrite("./test.jpg", &roi_image, &Vector::default());
 
     let mut tensors = Array3::<f32>::zeros((img_shape.width as usize, img_shape.height as usize, 3usize));
 

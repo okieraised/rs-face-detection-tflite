@@ -7,3 +7,4 @@ pub mod render;
 pub mod face_landmark;
 pub mod iris_landmark;
 pub mod face_anti_spoofing;
+pub mod face_embeddings;
