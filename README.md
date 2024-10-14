@@ -6,6 +6,9 @@ Rust using OpenCV and rust-ndarray.
 
 ## Models and Examples
 
+Note: Due to Github's file size limit, download the face embedding model from the following link:
+[face embeddings](https://www.digidow.eu/f/datasets/arcface-tensorflowlite/model.tflite)
+
 The package provides the following models:
 
 * Face Detection
