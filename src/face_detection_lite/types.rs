@@ -1,6 +1,6 @@
 use ndarray::{s, Array, Array1, Array2, ArrayD, IxDyn, Zip};
 use std::ops::Mul;
-use std::slice::Iter;
+use opencv::core::Mat;
 
 #[derive(Debug, Clone)]
 pub struct ImageTensor {

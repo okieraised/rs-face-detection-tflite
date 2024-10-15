@@ -26,7 +26,7 @@ mod tests {
 
         // Face detection
         let faces = face_detection.infer(&image, None).unwrap();
-        let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height)).unwrap();
+        let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height), None).unwrap();
 
         // Face landmark
         let face_landmark = FaceLandmark::new(None).unwrap();

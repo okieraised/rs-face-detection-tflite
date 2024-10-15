@@ -39,7 +39,7 @@ impl SizeMode {
     }
 }
 
-/// Convert a normalized bounding box into a ROI with optional scaling and and rotation.
+/// Convert a normalized bounding box into a ROI with optional scaling and rotation.
 /// This function combines parts of DetectionsToRect and RectTransformation MediaPipe nodes.
 pub fn bbox_to_roi(
     bbox: BBox, image_size: (i32, i32), rotation_keypoints: Option<Vec<(f64, f64)>>, scale: Option<(f64, f64)>,
@@ -166,7 +166,7 @@ pub fn bbox_from_landmarks(landmarks: &[Landmark]) -> Result<BBox, Error> {
 
 /// Load an image into an array and return data, image size, and padding.
 /// This function combines the mediapipe calculator-nodes ImageToTensor,
-/// mageCropping, and ImageTransformation into one function.
+/// ImageCropping, and ImageTransformation into one function.
 /// * Args:
 ///     - image (`Mat``): Input image; preferably RGB
 ///     - roi (`Option<Rect>`): Location within the image where to convert; can be `None`,

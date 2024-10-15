@@ -447,7 +447,7 @@ mod tests {
         let image = convert_image_to_mat(im_bytes).unwrap();
         let img_shape = image.size().unwrap();
         let faces = face_detection.infer(&image, None).unwrap();
-        let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height)).unwrap();
+        let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height), None).unwrap();
         let face_landmark = FaceLandmark::new(None).unwrap();
         let lmks = face_landmark.infer(&image, Some(face_roi)).unwrap();
         let (left_eye_roi, right_eye_roi) =

@@ -263,7 +263,6 @@ impl FaceDetection {
         let pruned_detections = non_maximum_suppression(detections, MIN_SUPPRESSION_THRESHOLD, Some(MIN_SCORE), true);
 
         let detections = detection_letterbox_removal(pruned_detections, image_data.padding);
-        // println!("detections: {:?}", detections);
         Ok(detections)
     }
 
@@ -417,21 +416,6 @@ fn ssd_generate_anchors(opts: &SSDOptions) -> Array2<f32> {
 mod tests {
     use super::*;
     use crate::face_detection_lite::render::render_to_image;
-
-    // #[test]
-    // fn test_face_detection() {
-    //     let face_detection = match FaceDetection::new(FaceDetectionModel::BackCamera, None) {
-    //         Ok(face_detection) => face_detection,
-    //         Err(e) => {
-    //             println!("{:?}", e);
-    //             return;
-    //         }
-    //     };
-    //
-    //     let im_bytes: &[u8] = include_bytes!("/Users/tripham/Desktop/face-detection-tflite/women.png");
-    //     let image = convert_image_to_mat(im_bytes).unwrap();
-    //     let detections = face_detection.infer(&image, None).unwrap();
-    // }
 
     #[test]
     fn test_ndarray() {

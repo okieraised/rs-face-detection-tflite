@@ -177,7 +177,7 @@ const MAX_FACE_LANDMARK: usize = FACE_LANDMARK_CONNECTIONS.len();
 ///
 /// * Returns:
 ///     - `Rect`: Normalized ROI for passing to `FaceLandmark`.
-pub fn face_detection_to_roi(face_detection: Detection, image_size: (i32, i32)) -> Result<Rect, Error> {
+pub fn face_detection_to_roi(face_detection: Detection, image_size: (i32, i32), size_mode: Option<SizeMode>) -> Result<Rect, Error> {
     let absolute_detection: Detection = face_detection.scaled_by_image_size((image_size.0, image_size.1));
     let left_eye_f32 = absolute_detection.keypoint(FaceIndex::LeftEye as usize);
     let left_eye: (f64, f64) = (left_eye_f32.0 as f64, left_eye_f32.1 as f64);
@@ -185,12 +185,14 @@ pub fn face_detection_to_roi(face_detection: Detection, image_size: (i32, i32)) 
     let right_eye_f32 = absolute_detection.keypoint(FaceIndex::RightEye as usize);
     let right_eye: (f64, f64) = (right_eye_f32.0 as f64, right_eye_f32.1 as f64);
 
+    let size_mode = size_mode.unwrap_or(SizeMode::SquareLong);
+
     let roi = bbox_to_roi(
         face_detection.bbox(),
         image_size,
         Some(vec![left_eye, right_eye]),
         Some(ROI_SCALE),
-        Some(SizeMode::SquareLong),
+        Some(size_mode),
     );
     roi
 }
@@ -353,7 +355,7 @@ mod tests {
 
         let faces = face_detection.infer(&image, None).unwrap();
 
-        let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height)).unwrap();
+        let face_roi = face_detection_to_roi(faces[0].clone(), (img_shape.width, img_shape.height), None).unwrap();
 
         let face_landmark = FaceLandmark::new(None).unwrap();
         let lmks = face_landmark.infer(&image, Some(face_roi)).unwrap();
