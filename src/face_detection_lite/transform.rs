@@ -185,10 +185,7 @@ pub fn bbox_from_landmarks(landmarks: &[Landmark]) -> Result<BBox, Error> {
 /// * Returns:
 ///         (`ImageTensor`): Tensor data, padding for reversing letterboxing and
 ///         original image dimensions.
-pub fn image_to_tensor(
-    image: &Mat, roi: Option<Rect>, output_size: Option<(i32, i32)>, keep_aspect_ratio: bool, output_range: (f64, f64),
-    flip_horizontal: bool,
-) -> Result<ImageTensor, Error> {
+pub fn image_to_tensor(image: &Mat, roi: Option<Rect>, output_size: Option<(i32, i32)>, keep_aspect_ratio: bool, output_range: (f64, f64), flip_horizontal: bool) -> Result<ImageTensor, Error> {
     let original_img_shape = image.size()?;
     let mut roi = roi.unwrap_or_else(|| Rect {
         x_center: 0.5,
@@ -291,8 +288,6 @@ pub fn image_to_tensor(
     let min_val = output_range.0;
     let max_val = output_range.1;
     let img_shape = roi_image.size()?;
-
-    imwrite("./test.jpg", &roi_image, &Vector::default());
 
     let mut tensors = Array3::<f32>::zeros((img_shape.width as usize, img_shape.height as usize, 3usize));
 
